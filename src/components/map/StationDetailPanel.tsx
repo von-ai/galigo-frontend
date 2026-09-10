@@ -2,14 +2,139 @@
 
 import type { StationDetail } from '@/lib/types';
 
-const CATEGORY_LABEL: Record<string, string> = {
-  makan: 'Makan',
-  musholla: 'Musholla',
-  atm: 'ATM',
-  toilet: 'Toilet',
-  umkm: 'UMKM',
-  wisata: 'Wisata',
+const CATEGORY_CONFIG: Record<
+  string,
+  { label: string; icon: string; badge: string }
+> = {
+  makan: {
+    label: 'Makan',
+    icon: '🍜',
+    badge: 'bg-warn-bg text-warn',
+  },
+  musholla: {
+    label: 'Musholla',
+    icon: '🕌',
+    badge: 'bg-ok-bg text-ok',
+  },
+  atm: {
+    label: 'ATM',
+    icon: '🏧',
+    badge: 'bg-info-bg text-info',
+  },
+  toilet: {
+    label: 'Toilet',
+    icon: '🚻',
+    badge: 'bg-soft text-ink-500',
+  },
+  umkm: {
+    label: 'UMKM',
+    icon: '🏪',
+    badge: 'bg-magenta-100 text-magenta-600',
+  },
+  wisata: {
+    label: 'Wisata',
+    icon: '🏖️',
+    badge: 'bg-magenta-100 text-magenta-600',
+  },
+  pendidikan: {
+    label: 'Pendidikan',
+    icon: '🎓',
+    badge: 'bg-brand-100 text-brand-600',
+  },
+  kesehatan: {
+    label: 'Kesehatan',
+    icon: '🏥',
+    badge: 'bg-bad-bg text-bad',
+  },
+  pemerintahan: {
+    label: 'Pemerintahan',
+    icon: '🏛️',
+    badge: 'bg-brand-100 text-brand-600',
+  },
+  industri: {
+    label: 'Industri',
+    icon: '🏭',
+    badge: 'bg-soft text-ink-500',
+  },
+  ruang_publik: {
+    label: 'Ruang Publik',
+    icon: '🌳',
+    badge: 'bg-ok-bg text-ok',
+  },
+  transportasi: {
+    label: 'Transportasi',
+    icon: '🚌',
+    badge: 'bg-info-bg text-info',
+  },
 };
+
+const MODE_CONFIG: Record<
+  string,
+  {
+    label: string;
+    icon: string;
+    border: string;
+    bg: string;
+  }
+> = {
+  kereta: {
+    label: 'Kereta',
+    icon: '🚆',
+    border: 'border-kereta',
+    bg: 'bg-kereta/10',
+  },
+  bus: {
+    label: 'Bus',
+    icon: '🚌',
+    border: 'border-bus',
+    bg: 'bg-bus/10',
+  },
+  pete_pete: {
+    label: 'Pete-Pete',
+    icon: '🚐',
+    border: 'border-pete',
+    bg: 'bg-pete/10',
+  },
+};
+
+function getCategoryConfig(category: string) {
+  return (
+    CATEGORY_CONFIG[category] ?? {
+      label: category,
+      icon: '📍',
+      badge: 'bg-soft text-ink-500',
+    }
+  );
+}
+
+function SectionHeader({
+  title,
+  count,
+}: {
+  title: string;
+  count: number;
+}) {
+  return (
+    <div className="mt-5 flex items-center gap-2">
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+        {title}
+      </h4>
+      {count > 0 && (
+        <span className="rounded-pill bg-soft px-1.5 py-0.5 text-[10px] font-semibold text-ink-500">
+          {count}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <p className="mt-2 text-sm text-ink-300">
+      {text}
+    </p>
+  );
+}
 
 export function StationDetailPanel({
   station,
@@ -19,93 +144,149 @@ export function StationDetailPanel({
   onClose: () => void;
 }) {
   return (
-    <div className="absolute bottom-4 left-4 right-4 z-1000 max-w-md rounded-card border border-line bg-card p-4 shadow-3 md:right-auto">
-      <div className="flex items-start justify-between">
-        <h3 className="text-base font-semibold text-ink-900">
+    <div className="absolute inset-x-0 bottom-0 z-1000 max-h-[70vh] overflow-y-auto rounded-t-card border-t border-line bg-card shadow-3">
+      <div className="mx-auto mt-2 h-1 w-10 rounded-pill bg-line-strong" />
+
+      {/* Header */}
+      <div className="flex items-start justify-between px-5 pt-3">
+        <h3 className="text-lg font-bold text-ink-900">
           {station.name}
         </h3>
         <button
           onClick={onClose}
-          className="text-ink-300 hover:text-ink-700"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-soft text-ink-500 hover:text-ink-900"
           aria-label="Tutup panel"
         >
           ✕
         </button>
       </div>
 
-      <h4 className="mt-3 text-xs font-semibold uppercase tracking-wide text-ink-500">
-        Rekomendasi terdekat
-      </h4>
-      {station.nearbyPois.length === 0 ? (
-        <p className="mt-1 text-sm text-ink-500">
-          Belum ada tempat terdata di sekitar
-          titik ini.
-        </p>
-      ) : (
-        <ul className="mt-1 space-y-1">
-          {station.nearbyPois.map((p) => (
-            <li
-              key={p.id}
-              className="flex justify-between text-sm"
-            >
-              <span className="font-medium text-ink-900">
-                {p.name}{' '}
-                <span className="text-ink-300">
-                  ·{' '}
-                  {CATEGORY_LABEL[p.category] ??
-                    p.category}
-                </span>
-              </span>
-              <span className="shrink-0 text-ink-500">
-                {Math.round(p.distance_m)} m
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <h4 className="mt-3 text-xs font-semibold uppercase tracking-wide text-ink-500">
-        Estimasi kedatangan
-      </h4>
-      {station.estimates.length === 0 ? (
-        <p className="mt-1 text-sm text-ink-500">
-          Belum ada data estimasi.
-        </p>
-      ) : (
-        <ul className="mt-1 space-y-1.5">
-          {station.estimates.map((e) => (
-            <li
-              key={e.id}
-              className={`rounded-sm2 border p-2 text-sm ${
-                e.isSurveyed
-                  ? 'border-line'
-                  : 'border-dashed border-line-strong'
-              }`}
-            >
-              <div className="flex justify-between">
-                <span className="font-semibold capitalize">
-                  {e.mode.replace('_', '-')}
-                </span>
-                <span
-                  className={
+      <div className="px-5 pb-6">
+        {/* Estimasi kedatangan — kartu horizontal berwarna per moda */}
+        <SectionHeader
+          title="Estimasi Kedatangan"
+          count={station.estimates.length}
+        />
+        {station.estimates.length === 0 ? (
+          <EmptyState text="Belum ada data estimasi untuk titik ini." />
+        ) : (
+          <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+            {station.estimates.map((e) => {
+              const mode = MODE_CONFIG[
+                e.mode
+              ] ?? {
+                label: e.mode,
+                icon: '🚏',
+                border: 'border-line',
+                bg: 'bg-soft',
+              };
+              return (
+                <div
+                  key={e.id}
+                  className={`min-w-37.5 shrink-0 rounded-card border-2 p-3 ${
                     e.isSurveyed
-                      ? 'font-bold text-brand-600'
-                      : 'text-ink-300'
-                  }
+                      ? mode.border
+                      : 'border-dashed border-line-strong bg-soft'
+                  } ${e.isSurveyed ? mode.bg : ''}`}
                 >
-                  {e.isSurveyed
-                    ? (e.fixedTimeLabel ??
-                      `${e.minMinutes}–${e.maxMinutes} menit`)
-                    : 'Belum tersurvei'}
-                </span>
-              </div>
-              <div className="mt-0.5 text-xs text-ink-300">
-                {e.sourceLabel}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+                  <div className="flex items-center gap-1.5 text-sm font-semibold text-ink-900">
+                    <span>{mode.icon}</span>
+                    <span>{mode.label}</span>
+                  </div>
+                  <div
+                    className={`mt-2 text-lg font-bold ${e.isSurveyed ? 'text-ink-900' : 'text-ink-300'}`}
+                  >
+                    {e.isSurveyed
+                      ? (e.fixedTimeLabel ??
+                        `${e.minMinutes}–${e.maxMinutes} mnt`)
+                      : 'Belum tersurvei'}
+                  </div>
+                  <div className="mt-1 text-[11px] leading-tight text-ink-500">
+                    {e.sourceLabel}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Rekomendasi terdekat — amenitas jalan kaki (600m) */}
+        <SectionHeader
+          title="Rekomendasi Terdekat"
+          count={station.nearbyPois.length}
+        />
+        {station.nearbyPois.length === 0 ? (
+          <EmptyState text="Belum ada tempat terdata di sekitar titik ini." />
+        ) : (
+          <ul className="mt-2 divide-y divide-line">
+            {station.nearbyPois.map((p) => {
+              const cfg = getCategoryConfig(
+                p.category,
+              );
+              return (
+                <li
+                  key={p.id}
+                  className="flex items-center gap-3 py-2.5"
+                >
+                  <span
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-sm2 text-sm ${cfg.badge}`}
+                  >
+                    {cfg.icon}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium text-ink-900">
+                      {p.name}
+                    </div>
+                    <div className="text-xs text-ink-500">
+                      {cfg.label}
+                    </div>
+                  </div>
+                  <span className="shrink-0 rounded-pill bg-soft px-2 py-1 text-xs font-medium text-ink-500">
+                    {Math.round(p.distance_m)} m
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {/* Kawasan sekitar — landmark skala kawasan, dijodohkan ke stasiun terdekat */}
+        <SectionHeader
+          title="Kawasan Sekitar"
+          count={station.kawasanPois.length}
+        />
+        {station.kawasanPois.length === 0 ? (
+          <EmptyState text="Belum ada data kawasan untuk titik ini." />
+        ) : (
+          <ul className="mt-2 divide-y divide-line">
+            {station.kawasanPois.map((p) => {
+              const cfg = getCategoryConfig(
+                p.category,
+              );
+              return (
+                <li
+                  key={p.id}
+                  className="flex items-center gap-3 py-2.5"
+                >
+                  <span
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-sm2 text-sm ${cfg.badge}`}
+                  >
+                    {cfg.icon}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium text-ink-900">
+                      {p.name}
+                    </div>
+                    <div className="text-xs text-ink-500">
+                      {cfg.label}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

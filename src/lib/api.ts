@@ -63,14 +63,24 @@ export const api = {
     request<Poi[]>(
       `/poi${category ? `?category=${category}` : ''}`,
     ),
-  chat: (message: string, stationSlug?: string) =>
-    request<ChatResponse>('/chat', {
-      method: 'POST',
-      body: JSON.stringify({
-        message,
-        stationSlug,
-      }),
-    }),
+  chat: (
+    message: string,
+    stationSlug?: string,
+    fromSlug?: string,
+    toSlug?: string,
+  ) =>
+    request<{ reply: string; sources: any[] }>(
+      '/chat',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          message,
+          stationSlug,
+          fromSlug,
+          toSlug,
+        }),
+      },
+    ),
 
   // Auth
   login: (email: string, password: string) =>
