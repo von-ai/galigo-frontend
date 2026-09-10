@@ -1,4 +1,3 @@
-// src/components/map/GaligoMap.tsx
 'use client';
 
 import {
@@ -21,12 +20,20 @@ import {
   type LayerKey,
 } from './LayerFilterChips';
 import { StatsSheet } from './StatsSheets';
+import { ChatWidget } from '../chat/ChatWidget';
 
 const stationIcon = L.divIcon({
   className: '',
   html: `<div style="width:20px;height:20px;border-radius:9999px;background:#5B2D8E;border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
   iconSize: [20, 20],
   iconAnchor: [10, 10],
+});
+
+const wisataIcon = L.divIcon({
+  className: '',
+  html: `<div style="width:18px;height:18px;border-radius:9999px;background:#C2379B;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-size:10px;">📍</div>`,
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
 });
 
 const ROUTE_COLOR: Record<string, string> = {
@@ -36,6 +43,25 @@ const ROUTE_COLOR: Record<string, string> = {
 };
 
 type LoadState = 'loading' | 'ready' | 'error';
+
+function toLatLngs(geometry: {
+  type: string;
+  coordinates: any;
+}): any {
+  if (geometry.type === 'MultiLineString') {
+    return geometry.coordinates.map(
+      (line: [number, number][]) =>
+        line.map(
+          ([lng, lat]) =>
+            [lat, lng] as [number, number],
+        ),
+    );
+  }
+  return geometry.coordinates.map(
+    ([lng, lat]: [number, number]) =>
+      [lat, lng] as [number, number],
+  );
+}
 
 export default function GaligoMap() {
   const mapContainer =
@@ -47,6 +73,7 @@ export default function GaligoMap() {
   const routeLayersRef = useRef<
     Map<LayerKey, L.Polyline[]>
   >(new Map());
+  const wisataMarkersRef = useRef<L.Marker[]>([]);
 
   const [loadState, setLoadState] =
     useState<LoadState>('loading');
@@ -61,6 +88,7 @@ export default function GaligoMap() {
     useState<StationSummary | null>(null);
   const [sheetOpen, setSheetOpen] =
     useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const [activeLayers, setActiveLayers] =
     useState<Set<LayerKey>>(
       new Set([
@@ -71,6 +99,26 @@ export default function GaligoMap() {
         'stasiun',
       ]),
     );
+
+  // Tiga overlay bottom (panel detail, sheet statistik, chat) saling
+  // eksklusif — di layar sempit, dua overlay terbuka sekaligus bertumpuk.
+  function openStationPanel(
+    detail: StationDetail,
+  ) {
+    setSheetOpen(false);
+    setChatOpen(false);
+    setSelected(detail);
+  }
+  function openStatsSheet() {
+    setSelected(null);
+    setChatOpen(false);
+    setSheetOpen(true);
+  }
+  function openChat() {
+    setSelected(null);
+    setSheetOpen(false);
+    setChatOpen(true);
+  }
 
   useEffect(() => {
     if (!mapContainer.current) return;
@@ -104,12 +152,14 @@ export default function GaligoMap() {
       api.stations(),
       api.routes(),
       api.stationsSummary(),
+      api.poi('wisata'),
     ])
       .then(
         ([
           stationList,
           routeList,
           summaryData,
+          wisataList,
         ]) => {
           if (cancelled) return;
           setStations(stationList);
@@ -129,25 +179,57 @@ export default function GaligoMap() {
           }
 
           for (const r of routeList) {
-            const latlngs =
-              r.geometry.coordinates.map(
-                ([lng, lat]) =>
-                  [lat, lng] as [number, number],
-              );
-            const line = L.polyline(latlngs, {
-              color:
-                ROUTE_COLOR[r.mode] ?? '#999',
-              weight: r.mode === 'kereta' ? 4 : 3,
-            }).addTo(map);
+            const latlngs = toLatLngs(r.geometry);
+            const color =
+              ROUTE_COLOR[r.mode] ?? '#999';
+            const isSpine = r.name.includes(
+              'garis penghubung',
+            );
             const key = r.mode as LayerKey;
             const existing =
               routeLayersRef.current.get(key) ??
               [];
-            existing.push(line);
+
+            if (isSpine) {
+              const line = L.polyline(latlngs, {
+                color,
+                weight: 2,
+                dashArray: '6 6',
+                opacity: 0.6,
+              }).addTo(map);
+              existing.push(line);
+            } else {
+              const baseWeight =
+                r.mode === 'kereta' ? 4 : 3;
+              const casing = L.polyline(latlngs, {
+                color: '#00000066',
+                weight: baseWeight + 3,
+              }).addTo(map);
+              const line = L.polyline(latlngs, {
+                color,
+                weight: baseWeight,
+              }).addTo(map);
+              existing.push(casing, line);
+            }
             routeLayersRef.current.set(
               key,
               existing,
             );
+          }
+
+          for (const w of wisataList) {
+            const [lng, lat] =
+              w.geometry.coordinates;
+            const marker = L.marker([lat, lng], {
+              icon: wisataIcon,
+            }).addTo(map);
+            const photoHtml = w.photoUrl
+              ? `<img src="${w.photoUrl}" style="width:100%;height:100px;object-fit:cover;border-radius:8px;margin-bottom:6px" />`
+              : '';
+            marker.bindPopup(
+              `<div style="max-width:220px">${photoHtml}<strong>${w.name}</strong><p style="margin:4px 0 0;font-size:12px;color:#453960">${w.description ?? ''}</p></div>`,
+            );
+            wisataMarkersRef.current.push(marker);
           }
 
           setLoadState('ready');
@@ -164,6 +246,10 @@ export default function GaligoMap() {
         m.remove(),
       );
       markersRef.current = [];
+      wisataMarkersRef.current.forEach((m) =>
+        m.remove(),
+      ); // <-- baru
+      wisataMarkersRef.current = []; // <-- baru
       routeLayersRef.current.forEach((lines) =>
         lines.forEach((l) => l.remove()),
       );
@@ -177,10 +263,10 @@ export default function GaligoMap() {
   async function handleSelectStation(
     slug: string,
   ) {
-    setSheetOpen(false); // hindari dua panel bawah tumpang tindih
     setSelectedLoading(true);
     try {
-      setSelected(await api.station(slug));
+      const detail = await api.station(slug);
+      openStationPanel(detail);
     } catch (err) {
       console.error(
         'Gagal ambil detail stasiun:',
@@ -211,10 +297,6 @@ export default function GaligoMap() {
       );
       return;
     }
-
-    // 'halte' belum ada entitas terpisah di data kita — chip sengaja
-    // dibiarkan tampil untuk paritas visual dengan mockup, tapi belum
-    // fungsional sampai ada data halte sungguhan.
     if (key === 'halte') return;
 
     routeLayersRef.current
@@ -255,6 +337,7 @@ export default function GaligoMap() {
           Memuat detail titik…
         </div>
       )}
+
       {selected && !selectedLoading && (
         <StationDetailPanel
           station={selected}
@@ -263,10 +346,7 @@ export default function GaligoMap() {
       )}
 
       <button
-        onClick={() => {
-          setSelected(null);
-          setSheetOpen(true);
-        }}
+        onClick={openStatsSheet}
         className="absolute bottom-4 right-4 z-1000 flex h-12 w-12 items-center justify-center rounded-pill bg-card text-lg shadow-3"
         aria-label="Buka statistik wilayah"
       >
@@ -280,6 +360,18 @@ export default function GaligoMap() {
           onClose={() => setSheetOpen(false)}
         />
       )}
+
+      <ChatWidget
+        stations={stations}
+        currentStationSlug={
+          selected?.slug ?? null
+        }
+        onSelectStation={handleSelectStation}
+        isOpen={chatOpen}
+        onOpenChange={(next) =>
+          next ? openChat() : setChatOpen(false)
+        }
+      />
     </div>
   );
 }

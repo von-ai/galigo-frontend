@@ -17,9 +17,17 @@ export type Poi = {
     | 'atm'
     | 'toilet'
     | 'umkm'
-    | 'wisata';
+    | 'wisata'
+    | 'pendidikan'
+    | 'kesehatan'
+    | 'pemerintahan'
+    | 'industri'
+    | 'ruang_publik'
+    | 'transportasi';
   stationId: string | null;
   address: string | null;
+  description: string | null;
+  photoUrl: string | null;
   dataSource: 'mapid' | 'manual';
   geometry: GeoJSONPoint;
 };
@@ -30,6 +38,8 @@ export type NearbyPoi = Pick<
   | 'name'
   | 'category'
   | 'address'
+  | 'description'
+  | 'photoUrl'
   | 'geometry'
 > & {
   distance_m: number;
@@ -104,6 +114,7 @@ export type Station = StationBase & {
 export type StationDetail = StationBase & {
   nearbyPois: NearbyPoi[];
   estimates: TransportEstimate[];
+  kawasanPois: KawasanPoi[];
 };
 
 export type RouteLine = {
@@ -112,14 +123,26 @@ export type RouteLine = {
   mode: 'kereta' | 'bus' | 'pete_pete';
   stationId: string | null;
   dataSource: 'mapid' | 'manual';
-  geometry: {
-    type: 'LineString';
-    coordinates: [number, number][];
-  };
+  geometry:
+    | {
+        type: 'LineString';
+        coordinates: [number, number][];
+      }
+    | {
+        type: 'MultiLineString';
+        coordinates: [number, number][][];
+      };
 };
 
 export type StationSummary = {
   stationCount: number;
   peteRouteCount: number;
   poiCount: number;
+};
+
+export type KawasanPoi = {
+  id: string;
+  name: string;
+  category: string;
+  address: string | null;
 };
