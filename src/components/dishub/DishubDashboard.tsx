@@ -1,6 +1,6 @@
-// src/components/dishub/DishubDashboard.tsx
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { KpiCard } from './KpiCard';
@@ -12,14 +12,40 @@ import type {
 
 export function DishubDashboard({
   corridorSlug,
-  initialStats,
-  initialSummary,
 }: {
   corridorSlug: string;
-  initialStats: InsightsStats | null;
-  initialSummary: AiSummary;
 }) {
   const router = useRouter();
+  const [stats, setStats] =
+    useState<InsightsStats | null>(null);
+  const [summary, setSummary] =
+    useState<AiSummary>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      api.insightsStats(),
+      api.insightsSummary(corridorSlug),
+    ])
+      .then(([s, sum]) => {
+        if (cancelled) return;
+        setStats(s);
+        setSummary(sum);
+      })
+      .catch((err) =>
+        console.error(
+          'Gagal ambil data dashboard:',
+          err,
+        ),
+      )
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [corridorSlug]);
 
   async function handleLogout() {
     await api.logout();
@@ -46,29 +72,34 @@ export function DishubDashboard({
         </button>
       </div>
 
-      <div className="mt-6 grid grid-cols-3 gap-3">
-        <KpiCard
-          label="Stasiun & Halte"
-          value={
-            initialStats?.stationCount ?? '–'
-          }
-        />
-        <KpiCard
-          label="Tempat terdata"
-          value={initialStats?.poiCount ?? '–'}
-        />
-        <KpiCard
-          label="Estimasi belum tersurvei"
-          value={
-            initialStats?.unsurveyedCount ?? '–'
-          }
-        />
-      </div>
-
-      <SummaryCard
-        corridorSlug={corridorSlug}
-        initialSummary={initialSummary}
-      />
+      {loading ? (
+        <p className="mt-6 text-sm text-dash-ink-2">
+          Memuat data…
+        </p>
+      ) : (
+        <>
+          <div className="mt-6 grid grid-cols-3 gap-3">
+            <KpiCard
+              label="Stasiun & Halte"
+              value={stats?.stationCount ?? '–'}
+            />
+            <KpiCard
+              label="Tempat terdata"
+              value={stats?.poiCount ?? '–'}
+            />
+            <KpiCard
+              label="Estimasi belum tersurvei"
+              value={
+                stats?.unsurveyedCount ?? '–'
+              }
+            />
+          </div>
+          <SummaryCard
+            corridorSlug={corridorSlug}
+            initialSummary={summary}
+          />
+        </>
+      )}
     </div>
   );
 }
