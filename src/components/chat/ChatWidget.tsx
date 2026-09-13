@@ -1,3 +1,4 @@
+// src/components/chat/ChatWidget.tsx
 'use client';
 
 import {
@@ -10,12 +11,20 @@ import type {
   ChatSource,
   Station,
 } from '@/lib/types';
+import { TripPlanCard } from './TripPlanCard';
 
-type ChatMessage = {
-  role: 'user' | 'assistant';
-  content: string;
-  sources?: ChatSource[];
-};
+type ChatMessage =
+  | {
+      kind: 'text';
+      role: 'user' | 'assistant';
+      content: string;
+      sources?: ChatSource[];
+    }
+  | {
+      kind: 'trip-plan';
+      fromSlug: string;
+      toSlug: string;
+    };
 
 export function ChatWidget({
   stations,
@@ -55,7 +64,11 @@ export function ChatWidget({
 
     setMessages((prev) => [
       ...prev,
-      { role: 'user', content: text },
+      {
+        kind: 'text',
+        role: 'user',
+        content: text,
+      },
     ]);
     setInput('');
     setError(null);
@@ -69,6 +82,7 @@ export function ChatWidget({
       setMessages((prev) => [
         ...prev,
         {
+          kind: 'text',
           role: 'assistant',
           content: res.reply,
           sources: res.sources,
@@ -92,54 +106,26 @@ export function ChatWidget({
     }
   }
 
-  async function handleFindRoute() {
-    if (!fromSlug || !toSlug || sending) return;
+  function handleFindRoute() {
+    if (!fromSlug || !toSlug) return;
     const fromName =
       stations.find((s) => s.slug === fromSlug)
         ?.name ?? fromSlug;
     const toName =
       stations.find((s) => s.slug === toSlug)
         ?.name ?? toSlug;
-    const text = `Bagaimana cara dari ${fromName} ke ${toName}?`;
 
+    // Pure data lookup — TIDAK lewat Gemini. Lebih cepat, gratis, dan
+    // tidak kena rate limit chat.
     setMessages((prev) => [
       ...prev,
-      { role: 'user', content: text },
+      {
+        kind: 'text',
+        role: 'user',
+        content: `Bagaimana cara dari ${fromName} ke ${toName}?`,
+      },
+      { kind: 'trip-plan', fromSlug, toSlug },
     ]);
-    setError(null);
-    setSending(true);
-
-    try {
-      const res = await api.chat(
-        text,
-        undefined,
-        fromSlug,
-        toSlug,
-      );
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: res.reply,
-          sources: res.sources,
-        },
-      ]);
-    } catch (err) {
-      if (
-        err instanceof ApiError &&
-        err.status === 429
-      ) {
-        setError(
-          'Terlalu banyak pertanyaan, tunggu beberapa menit lagi ya.',
-        );
-      } else {
-        setError(
-          'Gagal mengirim pesan. Coba lagi sebentar.',
-        );
-      }
-    } finally {
-      setSending(false);
-    }
   }
 
   function handleSourceClick(source: ChatSource) {
@@ -165,7 +151,7 @@ export function ChatWidget({
       </button>
 
       {isOpen && (
-        <div className="absolute bottom-36 right-4 z-1000 flex h-[min(28rem,70vh)] w-88 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-card border border-line bg-card shadow-3">
+        <div className="absolute bottom-36 right-4 z-1000 flex h-[min(32rem,75vh)] w-88 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-card border border-line bg-card shadow-3">
           <div className="bg-grad-brand px-4 py-3 text-white">
             <div className="text-sm font-semibold">
               Tanya GALIGO
@@ -216,9 +202,7 @@ export function ChatWidget({
             </div>
             <button
               onClick={handleFindRoute}
-              disabled={
-                !fromSlug || !toSlug || sending
-              }
+              disabled={!fromSlug || !toSlug}
               className="mt-2 w-full rounded-pill bg-brand-600 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
             >
               Cari rute
@@ -235,45 +219,59 @@ export function ChatWidget({
                 tempat di sekitar stasiun.
               </p>
             )}
-            {messages.map((m, i) => (
-              <div
-                key={i}
-                className={
-                  m.role === 'user'
-                    ? 'flex justify-end'
-                    : 'flex justify-start'
-                }
-              >
+            {messages.map((m, i) => {
+              if (m.kind === 'trip-plan') {
+                return (
+                  <TripPlanCard
+                    key={i}
+                    fromSlug={m.fromSlug}
+                    toSlug={m.toSlug}
+                  />
+                );
+              }
+              return (
                 <div
-                  className={`max-w-[85%] rounded-sm2 px-3 py-2 text-sm ${
+                  key={i}
+                  className={
                     m.role === 'user'
-                      ? 'bg-brand-600 text-white'
-                      : 'bg-soft text-ink-900'
-                  }`}
+                      ? 'flex justify-end'
+                      : 'flex justify-start'
+                  }
                 >
-                  <p>{m.content}</p>
-                  {m.sources &&
-                    m.sources.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {m.sources.map((s) => (
-                          <button
-                            key={s.id}
-                            onClick={() =>
-                              handleSourceClick(s)
-                            }
-                            disabled={
-                              s.type !== 'station'
-                            }
-                            className="rounded-pill border border-line-strong bg-card px-2 py-0.5 text-xs text-ink-700 disabled:opacity-60"
-                          >
-                            {s.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                  <div
+                    className={`max-w-[85%] rounded-sm2 px-3 py-2 text-sm ${
+                      m.role === 'user'
+                        ? 'bg-brand-600 text-white'
+                        : 'bg-soft text-ink-900'
+                    }`}
+                  >
+                    <p>{m.content}</p>
+                    {m.sources &&
+                      m.sources.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {m.sources.map((s) => (
+                            <button
+                              key={s.id}
+                              onClick={() =>
+                                handleSourceClick(
+                                  s,
+                                )
+                              }
+                              disabled={
+                                s.type !==
+                                'station'
+                              }
+                              className="rounded-pill border border-line-strong bg-card px-2 py-0.5 text-xs text-ink-700 disabled:opacity-60"
+                            >
+                              {s.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {sending && (
               <div className="text-xs text-ink-300">
                 Mengetik…
