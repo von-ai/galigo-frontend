@@ -14,6 +14,20 @@ import type {
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   'http://localhost:3001';
+const TOKEN_KEY = 'galigo_token';
+
+function getToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(TOKEN_KEY);
+}
+function setToken(token: string) {
+  if (typeof window !== 'undefined')
+    localStorage.setItem(TOKEN_KEY, token);
+}
+function clearToken() {
+  if (typeof window !== 'undefined')
+    localStorage.removeItem(TOKEN_KEY);
+}
 
 class ApiError extends Error {
   constructor(
@@ -28,11 +42,14 @@ async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
+  const token = getToken();
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
-    credentials: 'include', // selalu kirim cookie auth Dishub
     headers: {
       'Content-Type': 'application/json',
+      ...(token
+        ? { Authorization: `Bearer ${token}` }
+        : {}),
       ...options.headers,
     },
   });
@@ -47,15 +64,12 @@ async function request<T>(
       res.status,
     );
   }
-
-  // Beberapa endpoint (mis. logout) tidak selalu balikin body JSON penuh.
   return res.status === 204
     ? (undefined as T)
     : res.json();
 }
 
 export const api = {
-  // Publik
   stations: () => request<Station[]>('/stations'),
   station: (slug: string) =>
     request<StationDetail>(`/stations/${slug}`),
@@ -63,37 +77,51 @@ export const api = {
     request<Poi[]>(
       `/poi${category ? `?category=${category}` : ''}`,
     ),
+  routes: (mode?: string) =>
+    request<RouteLine[]>(
+      `/routes${mode ? `?mode=${mode}` : ''}`,
+    ),
+  stationsSummary: () =>
+    request<StationSummary>('/stations/summary'),
   chat: (
     message: string,
     stationSlug?: string,
     fromSlug?: string,
     toSlug?: string,
   ) =>
-    request<{ reply: string; sources: any[] }>(
-      '/chat',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          message,
-          stationSlug,
-          fromSlug,
-          toSlug,
-        }),
-      },
-    ),
+    request<ChatResponse>('/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        message,
+        stationSlug,
+        fromSlug,
+        toSlug,
+      }),
+    }),
 
-  // Auth
-  login: (email: string, password: string) =>
-    request<{ user: AuthUser }>('/auth/login', {
+  login: async (
+    email: string,
+    password: string,
+  ) => {
+    const data = await request<{
+      token: string;
+      user: AuthUser;
+    }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
-    }),
-  logout: () =>
-    request<{ ok: true }>('/auth/logout', {
-      method: 'POST',
-    }),
+    });
+    setToken(data.token);
+    return data;
+  },
+  logout: async () => {
+    clearToken();
+    return { ok: true };
+  },
+  me: () =>
+    request<{ userId: string; email: string }>(
+      '/auth/me',
+    ),
 
-  // Dishub (guarded)
   insightsStats: () =>
     request<InsightsStats>('/insights/stats'),
   insightsSummary: (corridorSlug: string) =>
@@ -104,18 +132,6 @@ export const api = {
     request<AiSummary>(
       `/insights/summary/${corridorSlug}/regenerate`,
       { method: 'POST' },
-    ),
-
-  routes: (mode?: string) =>
-    request<RouteLine[]>(
-      `/routes${mode ? `?mode=${mode}` : ''}`,
-    ),
-  stationsSummary: () =>
-    request<StationSummary>('/stations/summary'),
-
-  me: () =>
-    request<{ userId: string; email: string }>(
-      '/auth/me',
     ),
 };
 
