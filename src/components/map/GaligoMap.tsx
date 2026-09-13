@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useRouter } from 'next/navigation';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { api } from '@/lib/api';
@@ -19,7 +20,7 @@ import {
   LayerFilterChips,
   type LayerKey,
 } from './LayerFilterChips';
-import { StatsSheet } from './StatsSheets';
+import { InlineStats } from './InlineStats';
 import { ChatWidget } from '../chat/ChatWidget';
 
 const stationIcon = L.divIcon({
@@ -64,6 +65,7 @@ function toLatLngs(geometry: {
 }
 
 export default function GaligoMap() {
+  const router = useRouter();
   const mapContainer =
     useRef<HTMLDivElement>(null);
   const leafletMapRef = useRef<L.Map | null>(
@@ -86,8 +88,6 @@ export default function GaligoMap() {
   >([]);
   const [summary, setSummary] =
     useState<StationSummary | null>(null);
-  const [sheetOpen, setSheetOpen] =
-    useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [activeLayers, setActiveLayers] =
     useState<Set<LayerKey>>(
@@ -100,23 +100,14 @@ export default function GaligoMap() {
       ]),
     );
 
-  // Tiga overlay bottom (panel detail, sheet statistik, chat) saling
-  // eksklusif — di layar sempit, dua overlay terbuka sekaligus bertumpuk.
   function openStationPanel(
     detail: StationDetail,
   ) {
-    setSheetOpen(false);
     setChatOpen(false);
     setSelected(detail);
   }
-  function openStatsSheet() {
-    setSelected(null);
-    setChatOpen(false);
-    setSheetOpen(true);
-  }
   function openChat() {
     setSelected(null);
-    setSheetOpen(false);
     setChatOpen(true);
   }
 
@@ -248,8 +239,8 @@ export default function GaligoMap() {
       markersRef.current = [];
       wisataMarkersRef.current.forEach((m) =>
         m.remove(),
-      ); // <-- baru
-      wisataMarkersRef.current = []; // <-- baru
+      );
+      wisataMarkersRef.current = [];
       routeLayersRef.current.forEach((lines) =>
         lines.forEach((l) => l.remove()),
       );
@@ -309,35 +300,69 @@ export default function GaligoMap() {
   }
 
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-page">
-      <div
-        ref={mapContainer}
-        className="absolute inset-0"
-      />
+    <div className="flex min-h-screen flex-col bg-page">
+      {/* ── Map Section (sticky top) ── */}
+      <div className="relative h-[50vh] min-h-[300px] w-full shrink-0">
+        <div
+          ref={mapContainer}
+          className="absolute inset-0"
+        />
 
-      <MapHeader />
-      <LayerFilterChips
-        active={activeLayers}
-        onToggle={handleToggleLayer}
-      />
+        <MapHeader />
+        <LayerFilterChips
+          active={activeLayers}
+          onToggle={handleToggleLayer}
+        />
 
-      {loadState === 'loading' && (
-        <div className="absolute left-4 top-32 z-1000 rounded-pill bg-card px-4 py-2 text-sm text-ink-500 shadow-2">
-          Memuat data peta…
-        </div>
-      )}
-      {loadState === 'error' && (
-        <div className="absolute left-4 top-32 z-1000 rounded-card bg-bad-bg px-4 py-3 text-sm text-bad shadow-2">
-          Gagal memuat data dari server. Pastikan
-          backend jalan, lalu muat ulang halaman.
-        </div>
-      )}
-      {selectedLoading && (
-        <div className="absolute bottom-4 left-4 z-1000 rounded-pill bg-card px-4 py-2 text-sm text-ink-500 shadow-2">
-          Memuat detail titik…
-        </div>
-      )}
+        {/* Back button on map */}
+        <button
+          onClick={() => router.push('/beranda')}
+          className="absolute bottom-4 left-4 z-[1000] flex h-10 w-10 items-center justify-center rounded-full bg-white text-brand-600 shadow-2 hover:bg-soft transition"
+          aria-label="Kembali ke Beranda"
+        >
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
 
+        {/* Filter/menu button on map */}
+        <button
+          onClick={() => {}}
+          className="absolute bottom-4 right-4 z-[1000] flex h-10 w-10 items-center justify-center rounded-full bg-brand-600 text-white shadow-2"
+          aria-label="Filter"
+        >
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M4 6H16M6 10H14M8 14H12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
+        </button>
+
+        {loadState === 'loading' && (
+          <div className="absolute left-4 top-32 z-[1000] rounded-pill bg-card px-4 py-2 text-sm text-ink-500 shadow-2">
+            Memuat data peta…
+          </div>
+        )}
+        {loadState === 'error' && (
+          <div className="absolute left-4 top-32 z-[1000] rounded-card bg-bad-bg px-4 py-3 text-sm text-bad shadow-2">
+            Gagal memuat data dari server. Pastikan
+            backend jalan, lalu muat ulang halaman.
+          </div>
+        )}
+        {selectedLoading && (
+          <div className="absolute bottom-4 left-16 z-[1000] rounded-pill bg-card px-4 py-2 text-sm text-ink-500 shadow-2">
+            Memuat detail titik…
+          </div>
+        )}
+      </div>
+
+      {/* ── Scrollable Content Below Map ── */}
+      <div className="relative z-10 -mt-3 flex-1 rounded-t-[20px] bg-page">
+        <InlineStats
+          stations={stations}
+          summary={summary}
+        />
+      </div>
+
+      {/* ── Overlays (Station Detail Panel) ── */}
       {selected && !selectedLoading && (
         <StationDetailPanel
           station={selected}
@@ -345,22 +370,7 @@ export default function GaligoMap() {
         />
       )}
 
-      <button
-        onClick={openStatsSheet}
-        className="absolute bottom-4 right-4 z-1000 flex h-12 w-12 items-center justify-center rounded-pill bg-card text-lg shadow-3"
-        aria-label="Buka statistik wilayah"
-      >
-        ☰
-      </button>
-
-      {sheetOpen && (
-        <StatsSheet
-          stations={stations}
-          summary={summary}
-          onClose={() => setSheetOpen(false)}
-        />
-      )}
-
+      {/* ── Chat Widget ── */}
       <ChatWidget
         stations={stations}
         currentStationSlug={

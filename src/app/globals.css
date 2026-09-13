@@ -50,6 +50,7 @@
   --color-bad-bg: #fbeaf1;
   --color-info: #5b6ce8;
   --color-info-bg: #eceefd;
+  --color-accent-yellow: #f5ba31;
 
   /* Font — variable ini datang dari next/font/google di layout.tsx */
   --font-sans:
@@ -79,3 +80,72 @@
     #8e3299 100%
   );
 }
+
+/* Hide scrollbar for clean horizontal scrolls */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ───────── Splash screen loading bar ───────── */
+@keyframes splash-load {
+  0% { width: 0; }
+  100% { width: 100%; }
+}
+
+.splash-loading-track {
+  width: 160px;
+  height: 4px;
+  background: #e6e1f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.splash-loading-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #5b2d8e, #c2379b);
+  animation: splash-load 2s ease-in-out forwards;
+}
+
+/* ───────── Fade-in utility ───────── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out both;
+}
+
+/* ───────── Chart donut (CSS conic-gradient) ───────── */
+.donut-chart {
+  width: 120px;
+  height: 120px;
+  border-radius: 9999px;
+  position: relative;
+}
+
+.donut-chart::after {
+  content: '';
+  position: absolute;
+  inset: 20px;
+  border-radius: 9999px;
+  background: white;
+}
+
+.donut-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 18px;
+  color: #1b1230;
+  z-index: 1;
+}
+
