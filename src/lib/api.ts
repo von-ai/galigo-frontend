@@ -106,15 +106,17 @@ export const api = {
       { method: 'POST' },
     ),
 
-  // src/lib/api.ts — tambahkan import type RouteLine, StationSummary di baris atas,
-  // lalu tambahkan dua method ini ke dalam object `api`:
-
   routes: (mode?: string) =>
     request<RouteLine[]>(
       `/routes${mode ? `?mode=${mode}` : ''}`,
     ),
   stationsSummary: () =>
     request<StationSummary>('/stations/summary'),
+
+  me: () =>
+    request<{ userId: string; email: string }>(
+      '/auth/me',
+    ),
 };
 
 export { ApiError };
